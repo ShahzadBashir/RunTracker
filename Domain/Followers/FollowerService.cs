@@ -1,4 +1,5 @@
-﻿using Domain.Users;
+﻿using Domain.Abstraction;
+using Domain.Users;
 
 namespace Domain.Followers;
 
@@ -11,7 +12,7 @@ public sealed class FollowerService
         _followerRepository = followerRepository;
     }
 
-    public async Task StartFollowing(
+    public async Task<Result> StartFollowing(
         User user, 
         User followed, 
         DateTime createdOnUtc, 
@@ -19,12 +20,12 @@ public sealed class FollowerService
     {
         if(user.Id == followed.Id)
         {
-            throw new Exception("User can't follow yourself");
+            return Result.Failure(FollowerErrors.SameUser);
         }
 
         if(!followed.HasPublicProfile)
         {
-            throw new Exception("Can't follow pon-public profile");
+            return Result.Failure(FollowerErrors.NonPublicProfile);
         }
 
         if(await _followerRepository.IsAlreadyFollowing(
@@ -32,17 +33,13 @@ public sealed class FollowerService
             followed.Id, 
             cancellationToken))
         {
-            throw new Exception("Already following");
+            return Result.Failure(FollowerErrors.AlreadyFollowing);
         }
 
         var follower = Follower.Create(user.Id, followed.Id, createdOnUtc);
 
         await _followerRepository.Insert(follower, cancellationToken);
-    }
-}
 
-public interface IFollowerRepository
-{
-    Task<bool> IsAlreadyFollowing(Guid userId, Guid followedId, CancellationToken cancellationToken);
-    Task Insert(Follower follower, CancellationToken cancellationToken);
+        return Result.Success();
+    }
 }
